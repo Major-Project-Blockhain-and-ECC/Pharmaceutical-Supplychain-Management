@@ -8,14 +8,17 @@ class WorkerModel(BaseModel):
 class ProductModel(BaseModel):
     name: str
     description: str
-    requiredTemp: str
+    minTemp: int
+    maxTemp: int
+    minHumidity: int
+    maxHumidity: int
+    quantity: int
     mfgDate: str
 
 class StatusModel(BaseModel):
     productId: int
     location: str
-    temperature: str
-    humidity: str
-    heatIndex: str
+    temperature: int
+    humidity: int
     quantity: int
 

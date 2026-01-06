@@ -160,59 +160,99 @@ export default function App() {
         <MetaMaskConnect onAccountChange={handleAccountChange} />
       </Navbar>
       
-      <div className="main-container">
-        <div className="sidebar">
-          <div className="sidebar-menu">
-            {!connectedAccount ? (
-              <div className="sidebar-message">
-                <p>🔐 Please connect your wallet</p>
-              </div>
-            ) : !userRole ? (
-              <div className="sidebar-message">
-                <p>⚠️ Account not registered</p>
-                <small>Contact admin to register as a worker</small>
-              </div>
-            ) : (
-              <>
-                <div className="role-badge-container">
-                  <span className="role-badge">{userRole}</span>
-                </div>
-                
-                {availableMenuItems.map(item => (
-                  <button 
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id)} 
-                    className={activeTab === item.id ? "active" : ""}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </>
-            )}
+      {!connectedAccount ? (
+        // Landing Page
+        <div className="landing-page">
+          <div className="hero-section">
+            <div className="hero-content">
+              <h1 className="hero-title">
+                Pharmexis
+              </h1>
+              <p className="hero-subtitle">
+                Revolutionizing pharmaceutical supply chain with blockchain technology
+              </p>
+              <p className="hero-description">
+                Connect your MetaMask wallet to get started
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="content">
-          {!connectedAccount ? (
-            <div className="welcome-screen">
-              <h2>👋 Welcome to PharmaDApp</h2>
-              <p>Connect your MetaMask wallet to get started</p>
+          <div className="features-section">
+            <div className="feature-card">
+              <div className="feature-icon">🔒</div>
+              <h3>Secure & Transparent</h3>
+              <p>Blockchain-powered tracking ensures authenticity and prevents counterfeits</p>
             </div>
-          ) : !userRole ? (
-            <div className="welcome-screen">
-              <h2>⚠️ Account Not Registered</h2>
-              <p>Your account <code>{connectedAccount.slice(0, 6)}...{connectedAccount.slice(-4)}</code> is not registered in the system.</p>
-              <p>Please contact the system owner to register you as a worker.</p>
+            <div className="feature-card">
+              <div className="feature-icon">📦</div>
+              <h3>Real-Time Tracking</h3>
+              <p>Monitor your products at every stage of the supply chain</p>
             </div>
-          ) : (
-            renderContent()
-          )}
-        </div>
-      </div>
+            <div className="feature-card">
+              <div className="feature-icon">⚡</div>
+              <h3>Smart Automation</h3>
+              <p>Automated workflows and intelligent assignment systems</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon">🏆</div>
+              <h3>Performance Metrics</h3>
+              <p>Track worker performance and optimize your operations</p>
+            </div>
+          </div>
 
-      <footer className="app-footer">
-        <p>Copyright ©2025 All rights reserved | 💊 Pharmexis</p>
-      </footer>
+          <footer className="landing-footer">
+            <p>Copyright ©2025 All rights reserved | 💊 Pharmexis</p>
+          </footer>
+        </div>
+      ) : (
+        // App Dashboard (when connected)
+        <>
+          <div className="main-container">
+            <div className="sidebar">
+              <div className="sidebar-menu">
+                {!userRole ? (
+                  <div className="sidebar-message">
+                    <p>⚠️ Account not registered</p>
+                    <small>Contact admin to register as a worker</small>
+                  </div>
+                ) : (
+                  <>
+                    <div className="role-badge-container">
+                      <span className="role-badge">{userRole}</span>
+                    </div>
+                    
+                    {availableMenuItems.map(item => (
+                      <button 
+                        key={item.id}
+                        onClick={() => setActiveTab(item.id)} 
+                        className={activeTab === item.id ? "active" : ""}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="content">
+              {!userRole ? (
+                <div className="welcome-screen">
+                  <h2>⚠️ Account Not Registered</h2>
+                  <p>Your account <code>{connectedAccount.slice(0, 6)}...{connectedAccount.slice(-4)}</code> is not registered in the system.</p>
+                  <p>Please contact the system owner to register you as a worker.</p>
+                </div>
+              ) : (
+                renderContent()
+              )}
+            </div>
+          </div>
+
+          <footer className="app-footer">
+            <p>Copyright ©2025 All rights reserved | 💊 Pharmexis</p>
+          </footer>
+        </>
+      )}
     </div>
   );
 }

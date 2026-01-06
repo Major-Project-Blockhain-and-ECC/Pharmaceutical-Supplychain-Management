@@ -10,11 +10,15 @@ def calculate_worker_performance(worker_id: int, recent_only: bool = False, limi
     Calculate comprehensive performance metrics for a worker
     """
     try:
+        # Import MongoDB here to avoid circular dependency
+        from database import db
+        
         # Get worker info first to verify it exists
         worker = contract.functions.workers(worker_id).call()
         worker_address = worker[3]  # walletAddress field
+        worker_role = worker[2]  # role: 0=MANUFACTURER, 1=DISTRIBUTOR, 2=TRANSPORTER, 3=CUSTOMER
         
-        print(f"📊 Calculating performance for worker {worker_id} (address: {worker_address})")
+        print(f"📊 Calculating performance for worker {worker_id} (address: {worker_address}, role: {worker_role})")
         
         # Get product count by trying to call getProductCounter() first
         try:
@@ -62,6 +66,27 @@ def calculate_worker_performance(worker_id: int, recent_only: bool = False, limi
                 worker_involved = False
                 worker_temp_violations = 0
                 worker_humidity_violations = 0
+                manufacturer_created = False
+                
+                
+                if worker_role == 0:  # MANUFACTURER
+                    blockchain_current_owner = product[10]  # currentOwner at index 10 from blockchain
+                    
+                   
+                    try:
+                        if db is not None:
+                            mongo_product = db.products.find_one({"productId": i})
+                            if mongo_product and "currentOwner" in mongo_product:
+                                mongo_owner = mongo_product.get("currentOwner")
+                                if mongo_owner == worker_id:
+                                    manufacturer_created = True
+                                    print(f"    ✅ MongoDB shows manufacturer {worker_id} created product {i} (current blockchain owner: {blockchain_current_owner})")
+                    except Exception as mongo_err:
+                        print(f"    ⚠️ MongoDB check failed: {mongo_err}")
+                        # Fallback to blockchain
+                        if blockchain_current_owner == worker_id:
+                            manufacturer_created = True
+                            print(f"    ✅ Manufacturer {worker_id} is current owner on blockchain")
                 
                 for idx, status in enumerate(history):
                     # Status struct fields:
@@ -113,6 +138,11 @@ def calculate_worker_performance(worker_id: int, recent_only: bool = False, limi
                             out_of_range_readings += 1
                             worker_humidity_violations += 1
                 
+                # For manufacturers: count product creation as involvement
+                if manufacturer_created and not worker_involved:
+                    worker_involved = True
+                    print(f"    ✅ Manufacturer created this product!")
+                
                 if worker_involved:
                     handled_products.add(i)
                     total_shipments += 1
@@ -122,9 +152,21 @@ def calculate_worker_performance(worker_id: int, recent_only: bool = False, limi
                     # Product struct: 0:id, 1:name, 2:desc, 3:minTemp, 4:maxTemp, 
                     # 5:minHumid, 6:maxHumid, 7:qty, 8:mfgDate, 9:timestamp, 10:currentOwner, 11:isSpoiled
                     is_spoiled = product[11]  # isSpoiled at index 11
-                    if is_spoiled and (worker_temp_violations > 0 or worker_humidity_violations > 0):
-                        spoiled_shipments += 1
-                        print(f"    ⚠️ Product spoiled due to violations")
+                    
+                    # For manufacturers: only count as spoiled if the product is spoiled
+                    # (they set the quality thresholds, not responsible for transit violations by others)
+                    # For distributors/transporters: count as spoiled if they had violations
+                    if is_spoiled:
+                        if manufacturer_created and worker_role == 0:
+                            # Manufacturer's product got spoiled (quality design issue or later handler fault)
+                            # Only penalize if there were no status updates (meaning thresholds were too tight)
+                            if len(history) == 0:
+                                spoiled_shipments += 1
+                                print(f"    ⚠️ Product spoiled (manufacturer threshold issue)")
+                        elif worker_temp_violations > 0 or worker_humidity_violations > 0:
+                            # Distributor/transporter caused the spoilage
+                            spoiled_shipments += 1
+                            print(f"    ⚠️ Product spoiled due to worker's violations")
                         
             except Exception as e:
                 print(f"❌ Error processing product {i}: {e}")

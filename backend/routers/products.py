@@ -1,35 +1,85 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from model import ProductModel
 from contract import contract, send_transaction
-from database import db
+from database import get_database
 
 router = APIRouter(prefix="/products")
 
 @router.post("/add")
 def add_product(data: ProductModel):
     try:
+        # Get database connection
+        db = get_database()
+        
         contract_function = contract.functions.addProduct(
             data.name,
             data.description,
-            data.requiredTemp,
+            data.minTemp,
+            data.maxTemp,
+            data.minHumidity,
+            data.maxHumidity,
+            data.quantity,
             data.mfgDate
         )
         
         result = send_transaction(contract_function)
         
         if result["success"]:
-            db.products.insert_one(data.dict())
+            # Get the product ID from blockchain
+            try:
+                from contract import contract as contract_instance
+                product_id = None
+                
+                # Find the latest product
+                for i in range(100):
+                    try:
+                        product = contract_instance.functions.products(i).call()
+                        if product[1] == data.name:  # Match by name
+                            product_id = product[0]
+                    except:
+                        break
+                
+                # Insert full blockchain data structure
+                product_data = {
+                    "productId": product_id if product_id is not None else -1,
+                    "name": data.name,
+                    "description": data.description,
+                    "minTemp": data.minTemp,
+                    "maxTemp": data.maxTemp,
+                    "minHumidity": data.minHumidity,
+                    "maxHumidity": data.maxHumidity,
+                    "quantity": data.quantity,
+                    "mfgDate": data.mfgDate
+                }
+                
+                db.products.insert_one(product_data)
+                print(f"✅ Product saved to MongoDB: {product_data}")
+                
+            except Exception as mongo_error:
+                print(f"⚠️  MongoDB insert failed: {mongo_error}")
+                print(f"💡 Product is in blockchain. Will auto-sync on next startup.")
+            
             return {"message": "Product added", "tx_hash": result["tx_hash"]}
         else:
-            return {"error": result["error"]}, 400
+            raise HTTPException(status_code=400, detail=result["error"])
             
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/list")
 def list_products():
-    return list(db.products.find())
+    try:
+        db = get_database()
+        products = list(db.products.find())
+        # Convert ObjectId to string for JSON serialization
+        for product in products:
+            product["_id"] = str(product["_id"])
+        return products
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
 @router.get("/history/{product_id}")
@@ -51,4 +101,4 @@ def get_product_history(product_id: int):
             })
         return result
     except Exception as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(status_code=500, detail=str(e))
